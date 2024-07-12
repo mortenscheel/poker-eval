@@ -10,8 +10,8 @@ use std::time::Instant;
     about,
     after_help = "\
 <CARDS> examples:
-\"As 3c\": ace of spaces and three of clubs.
-\"Qd Th\": queen of diamonds and 10 of hearts)
+\"As 3c\": Ace of spaces and three of clubs.
+\"Qd Th\": Queen of diamonds and 10 of hearts.
 "
 )]
 struct Args {
