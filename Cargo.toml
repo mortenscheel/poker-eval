@@ -1,0 +1,15 @@
+[package]
+name = "poker-eval"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line poker equity evaluator"
+
+[profile.release]
+lto = true
+strip = true
+
+[dependencies]
+aya_poker = { version = "0.1.0", features = ["colored-4color"] }
+clap = { version = "4.5.9", features = ["cargo", "derive"] }
+clap_complete_command = "0.5.1"
+colored = "2.1.0"
