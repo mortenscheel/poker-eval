@@ -5,17 +5,21 @@ use std::cmp::Ordering;
 use std::time::Instant;
 
 #[derive(Parser, Debug)]
-#[command(version, about, after_help = "\
+#[command(
+    version,
+    about,
+    after_help = "\
 <CARDS> examples:
 \"As 3c\": ace of spaces and three of clubs.
 \"Qd Th\": queen of diamonds and 10 of hearts)
-")]
+"
+)]
 struct Args {
-    /// Player's hand
+    /// Player hand
     #[arg(short, long, value_name = "CARDS", visible_alias = "hero", value_parser = player_parser)]
     player: Option<Hand>,
 
-    /// Opponent's hand
+    /// Opponent hand
     #[arg(short, long, value_name = "CARDS", visible_alias = "villain", value_parser = player_parser)]
     opponent: Option<Hand>,
 
@@ -62,12 +66,12 @@ enum Output {
 fn main() -> Result<(), String> {
     let args = Args::parse();
     if let Some(command) = args.command {
-        match command {
+        return match command {
             Command::Completions { shell } => {
                 shell.generate(&mut Args::command(), &mut std::io::stdout());
-                return Ok(());
+                Ok(())
             }
-        }
+        };
     }
     let samples = args.samples;
     let seed = args.seed;
@@ -105,7 +109,7 @@ fn main() -> Result<(), String> {
                 100.0 * equity,
                 {
                     if board.is_empty() {
-                        "random board".to_string()
+                        "preflop".to_string()
                     } else {
                         board.to_string()
                     }
@@ -168,12 +172,20 @@ fn equity_calculator(
         // Then, for each run we draw cards to complete the board
         deck.reset();
         let mut player_hand = *player;
-        if player_hand.len() != 2 {
-            player_hand.extend(deck.deal(2 - player_hand.len()).unwrap().iter());
+        let player_missing = 2 - player_hand.len();
+        if player_missing > 0 {
+            player_hand = player_hand
+                .iter()
+                .chain(deck.deal(player_missing).unwrap().iter())
+                .collect::<Hand>();
         }
         let mut opponent_hand = *opponent;
-        if opponent_hand.len() != 2 {
-            opponent_hand.extend(deck.deal(2 - player_hand.len()).unwrap().iter());
+        let opponent_missing = 2 - opponent_hand.len();
+        if opponent_missing > 0 {
+            opponent_hand = opponent_hand
+                .iter()
+                .chain(deck.deal(opponent_missing).unwrap().iter())
+                .collect::<Hand>();
         }
         let missing = 5 - board.len();
         let complete_board = board
