@@ -7,12 +7,14 @@ A fast command-line equity evaluator for Texas Hold'em poker. Based on the excel
 2. Extract the `poker-eval` binary
 
 ### Git + Cargo
-1. `git clone https://github.com/mortenscheel/poker-eval`
-2. `cd poker-eval`
-3. `cargo install --path .`
+```bash
+git clone https://github.com/mortenscheel/poker-eval
+cd poker-eval
+cargo install --path .
+```
 
 ## Usage
-```bash
+```
 $ poker-eval --help
 Command-line poker equity evaluator
 
@@ -50,7 +52,7 @@ Options:
 ```
 
 ### Examples
-```bash
+```
 # Preflop comparison
 $ poker-eval --player "Ah Kc" --opponent "Qs Qd"
 K♣ A♥ has 43.0% equity on preflop against Q♦ Q♠.
