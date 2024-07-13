@@ -21,7 +21,11 @@ struct Args {
 
     /// Opponent hand
     #[arg(short, long, value_name = "CARDS", visible_alias = "villain", value_parser = player_parser)]
-    opponent: Option<Hand>,
+    opponent: Option<Vec<Hand>>,
+
+    /// Unknown (random) opponents
+    #[arg(short, long, default_value = "0")]
+    unknown_opponents: i8,
 
     /// Board cards
     #[arg(short, long, value_name = "CARDS", value_parser = board_parser)]
@@ -77,11 +81,14 @@ fn main() -> Result<(), String> {
     let seed = args.seed;
     let output = args.output;
     let player = args.player.unwrap_or(Hand::new());
-    let opponent = args.opponent.unwrap_or(Hand::new());
+    let mut opponents = args.opponent.unwrap_or_else(|| vec![Hand::new()]);
+    for _ in 0..args.unknown_opponents {
+        opponents.push(Hand::new())
+    }
     let board = args.board.unwrap_or(Hand::new());
 
     let start = Instant::now();
-    let equity = equity_calculator(&player, &opponent, &board, &samples, &seed);
+    let equity = equity_calculator(&player, &opponents, &board, &samples, &seed);
     if args.performance {
         let duration = start.elapsed().as_millis() as usize;
         let samples_per_milli = samples / duration;
@@ -97,31 +104,46 @@ fn main() -> Result<(), String> {
             println!("{}", equity);
         }
         Output::Pretty => {
-            println!(
-                "{} has {:.1}% equity on {} against {}.",
-                {
-                    if player.is_empty() {
-                        "Random hand".to_string()
-                    } else {
-                        player.to_string()
+            let player_label = {
+                if player.is_empty() {
+                    "Random hand".yellow().to_string()
+                } else {
+                    player.to_string()
+                }
+            };
+            let opponents_label = opponents
+                .iter()
+                .map(|o| {
+                    if o.is_empty() {
+                        return "random hand".yellow().to_string();
                     }
-                },
-                100.0 * equity,
-                {
-                    if board.is_empty() {
-                        "preflop".to_string()
-                    } else {
-                        board.to_string()
-                    }
-                },
-                {
-                    if opponent.is_empty() {
-                        "random hand".to_string()
-                    } else {
-                        opponent.to_string()
-                    }
-                },
-            );
+                    o.to_string()
+                })
+                .collect::<Vec<String>>();
+            let board_label = {
+                if board.is_empty() {
+                    "preflop".yellow().to_string()
+                } else {
+                    board.to_string()
+                }
+            };
+            if opponents.len() > 1 {
+                println!(
+                    "{} has {:.1}% equity on {} against [{}].",
+                    player_label,
+                    equity * 100.0,
+                    board_label,
+                    opponents_label.join(", ")
+                )
+            } else {
+                println!(
+                    "{} has {:.1}% equity on {} against {}.",
+                    player_label,
+                    equity * 100.0,
+                    board_label,
+                    opponents_label[0]
+                )
+            }
         }
     }
     Ok(())
@@ -153,17 +175,18 @@ fn hand_parser(val: &str, max: usize) -> Result<Hand, String> {
 
 fn equity_calculator(
     player: &Hand,
-    opponent: &Hand,
+    opponents: &Vec<Hand>,
     board: &Hand,
     samples: &usize,
     seed: &u64,
 ) -> f64 {
+    let all_opponent_cards = opponents.iter().flat_map(|o| o.iter()).collect::<Hand>();
     // To simulate board run-outs, we begin by preparing a deck
     // that doesn't contain the already dealt-out cards
     let available_cards = CARDS
         .iter()
         .filter(|c| !player.contains(c))
-        .filter(|c| !opponent.contains(c))
+        .filter(|c| !all_opponent_cards.contains(c))
         .filter(|c| !board.contains(c));
     let mut deck = Deck::with_seed(available_cards, *seed);
 
@@ -171,6 +194,11 @@ fn equity_calculator(
     for _ in 0..*samples {
         // Then, for each run we draw cards to complete the board
         deck.reset();
+        let missing = 5 - board.len();
+        let complete_board = board
+            .iter()
+            .chain(deck.deal(missing).unwrap().iter())
+            .collect::<Hand>();
         let mut player_hand = *player;
         let player_missing = 2 - player_hand.len();
         if player_missing > 0 {
@@ -179,27 +207,26 @@ fn equity_calculator(
                 .chain(deck.deal(player_missing).unwrap().iter())
                 .collect::<Hand>();
         }
-        let mut opponent_hand = *opponent;
-        let opponent_missing = 2 - opponent_hand.len();
-        if opponent_missing > 0 {
-            opponent_hand = opponent_hand
-                .iter()
-                .chain(deck.deal(opponent_missing).unwrap().iter())
-                .collect::<Hand>();
-        }
-        let missing = 5 - board.len();
-        let complete_board = board
-            .iter()
-            .chain(deck.deal(missing).unwrap().iter())
-            .collect::<Hand>();
-
         // Evaluate the player's hand given the completed board
         player_hand.extend(complete_board.iter());
         let player_rank = poker_rank(&player_hand);
 
-        // Evaluate the opponent's hand
-        opponent_hand.extend(complete_board.iter());
-        let opponent_rank = poker_rank(&opponent_hand);
+        let opponent_rank = opponents
+            .iter()
+            .map(|o| {
+                let mut opponent = *o;
+                let missing = 2 - opponent.len();
+                if missing > 0 {
+                    opponent = opponent
+                        .iter()
+                        .chain(deck.deal(missing).unwrap().iter())
+                        .collect::<Hand>();
+                }
+                opponent.extend(complete_board.iter());
+                poker_rank(&opponent)
+            })
+            .max()
+            .unwrap();
 
         // And record the player's share of the pot for the run
         match player_rank.cmp(&opponent_rank) {
@@ -210,4 +237,10 @@ fn equity_calculator(
     }
 
     pots_won / *samples as f64
+}
+
+#[test]
+fn verify_cli() {
+    use clap::CommandFactory;
+    Args::command().debug_assert();
 }

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2024-07-13
+
+### 🚀 Features
+
+- Support multiple opponents
+
 ## [0.1.3] - 2024-07-12
 
 ### ⚙️ Miscellaneous Tasks
